@@ -4,8 +4,10 @@ import path from 'path';
 import { dbService } from './services/db';
 import { ipoScheduler } from './scheduler/ipoScheduler';
 import { notifierService } from './services/notifier';
+import { sendTelegramMessage, formatSubsDeadlineMessage } from './services/telegram';
+import { fetchAllIpoSchedules } from './crawler/38crawler';
 
-const app = express();
+export const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
@@ -13,9 +15,20 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
 // 1. 공모주 목록 조회 API (주관사 필터, 검색어, 상태 필터 지원)
-app.get('/api/ipos', (req, res) => {
-  const { underwriters, search, status } = req.query;
+app.get('/api/ipos', async (req, res) => {
+  const { underwriters, search, status, refresh } = req.query;
+  
+  // 데이터가 없거나 수동 새로고침 요청인 경우 즉시 크롤링
   let list = dbService.getAllIpos();
+  if (list.length === 0 || refresh === 'true') {
+    try {
+      const crawled = await fetchAllIpoSchedules(false);
+      dbService.saveIpos(crawled);
+      list = dbService.getAllIpos();
+    } catch (e) {
+      console.warn('[API] On-demand crawl warning:', e);
+    }
+  }
 
   // 검색어 필터링
   if (typeof search === 'string' && search.trim()) {
@@ -80,6 +93,9 @@ app.post('/api/crawl/refresh', async (req, res) => {
 // 5. 환경설정 조회 및 저장 API
 app.get('/api/preferences', (req, res) => {
   const prefs = dbService.getPreferences();
+  // 환경변수가 있으면 우선 적용
+  if (process.env.TELEGRAM_BOT_TOKEN) prefs.telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (process.env.TELEGRAM_CHAT_ID) prefs.telegramChatId = process.env.TELEGRAM_CHAT_ID;
   res.json({ success: true, data: prefs });
 });
 
@@ -132,27 +148,80 @@ app.post('/api/notifications/test', async (req, res) => {
   });
 });
 
-// 8. 스케줄러 상태 조회 API
+// 8. 텔레그램 봇 테스트 메시지 전송 API
+app.post('/api/telegram/test', async (req, res) => {
+  const { botToken, chatId } = req.body;
+  const prefs = dbService.getPreferences();
+  const token = botToken || process.env.TELEGRAM_BOT_TOKEN || prefs.telegramBotToken;
+  const chat = chatId || process.env.TELEGRAM_CHAT_ID || prefs.telegramChatId;
+
+  if (!token || !chat) {
+    return res.status(400).json({
+      success: false,
+      message: '텔레그램 봇 토큰과 채팅 ID를 모두 입력해주세요.',
+    });
+  }
+
+  const sampleIpo = dbService.getAllIpos()[0] || {
+    id: 'sample',
+    name: '티앤이코리아 (샘플)',
+    market: '코스닥',
+    subsSchedule: '2026.10.20~10.21',
+    subsStartDate: '2026-10-20',
+    subsEndDate: '2026-10-21',
+    listingDate: '2026-10-30',
+    fixedPrice: '15,000',
+    hopePrice: '12,600~15,300',
+    competitionRate: '1,250:1',
+    underwriters: ['신한투자증권'],
+    detailUrl: 'http://www.38.co.kr/html/fund/',
+    status: 'SUBS_ACTIVE',
+    updatedAt: new Date().toISOString(),
+  };
+
+  const sampleMsg = formatSubsDeadlineMessage(sampleIpo);
+  const testMsg = `
+🔔 <b>[공모주 알리미] 텔레그램 봇 연동 테스트 성공!</b>
+
+정상적으로 텔레그램 알림을 수신할 수 있습니다.
+매일 <b>08:50(상장일)</b> 및 <b>15:50(청약마감일)</b>에 알림이 발송됩니다.
+
+---------------------------------
+<b>[발송 샘플 미리보기]</b>
+${sampleMsg}
+`.trim();
+
+  const success = await sendTelegramMessage({ botToken: token, chatId: chat }, testMsg);
+
+  if (success) {
+    // 설정 저장
+    dbService.updatePreferences({ telegramBotToken: token, telegramChatId: chat });
+    res.json({ success: true, message: '텔레그램 테스트 메시지가 성공적으로 전송되었습니다!' });
+  } else {
+    res.status(500).json({ success: false, message: '텔레그램 전송 실패: 토큰이나 채팅 ID를 다시 확인해주세요.' });
+  }
+});
+
+// 9. 스케줄러 상태 조회 API
 app.get('/api/scheduler/status', (req, res) => {
   const status = ipoScheduler.getStatus();
   res.json({ success: true, data: status });
 });
 
-// 서버 시작 및 초기화
-app.listen(PORT, async () => {
-  console.log(`\n======================================================`);
-  console.log(`🚀 공모주 알림 서버 실행 중: http://localhost:${PORT}`);
-  console.log(`======================================================\n`);
+// Vercel Serverless 및 로컬 서버 호환
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  app.listen(PORT, async () => {
+    console.log(`\n======================================================`);
+    console.log(`🚀 공모주 알림 서버 실행 중: http://localhost:${PORT}`);
+    console.log(`======================================================\n`);
 
-  // 스케줄러 등록
-  ipoScheduler.init();
+    ipoScheduler.init();
 
-  // 기존 저장 데이터가 없을 경우 최초 1회 즉시 크롤링
-  const existingIpos = dbService.getAllIpos();
-  if (existingIpos.length === 0) {
-    console.log('[Init] No cached IPO data found. Performing initial crawl...');
-    await ipoScheduler.runCrawl('SERVER_INITIAL_START');
-  } else {
-    console.log(`[Init] Loaded ${existingIpos.length} cached IPO items from disk.`);
-  }
-});
+    const existingIpos = dbService.getAllIpos();
+    if (existingIpos.length === 0) {
+      await ipoScheduler.runCrawl('SERVER_INITIAL_START');
+    }
+  });
+}
+
+export default app;

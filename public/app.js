@@ -277,6 +277,12 @@ function setupEventListeners() {
   document.getElementById('btn-test-subs').addEventListener('click', () => triggerTestAlert('SUBS_DEADLINE'));
   document.getElementById('btn-test-listing').addEventListener('click', () => triggerTestAlert('LISTING'));
 
+  // 텔레그램 테스트 메시지 전송 버튼
+  const btnTestTelegram = document.getElementById('btn-test-telegram');
+  if (btnTestTelegram) {
+    btnTestTelegram.addEventListener('click', handleTestTelegram);
+  }
+
   // 환경설정 저장
   document.getElementById('btn-save-settings').addEventListener('click', handleSavePreferences);
 }
@@ -407,10 +413,14 @@ function updatePreferencesUI() {
   const chkSubs = document.getElementById('chk-notify-subs');
   const chkListing = document.getElementById('chk-notify-listing');
   const inputWebhook = document.getElementById('input-webhook');
+  const inputTgToken = document.getElementById('input-tg-token');
+  const inputTgChat = document.getElementById('input-tg-chat');
 
   if (chkSubs) chkSubs.checked = state.preferences.notifySubsDeadline !== false;
   if (chkListing) chkListing.checked = state.preferences.notifyListing !== false;
   if (inputWebhook) inputWebhook.value = state.preferences.webhookUrl || '';
+  if (inputTgToken) inputTgToken.value = state.preferences.telegramBotToken || '';
+  if (inputTgChat) inputTgChat.value = state.preferences.telegramChatId || '';
 }
 
 function updateStats() {
@@ -718,12 +728,16 @@ async function handleSavePreferences() {
   const chkSubs = document.getElementById('chk-notify-subs');
   const chkListing = document.getElementById('chk-notify-listing');
   const inputWebhook = document.getElementById('input-webhook');
+  const inputTgToken = document.getElementById('input-tg-token');
+  const inputTgChat = document.getElementById('input-tg-chat');
 
   const payload = {
     preferredUnderwriters: Array.from(state.selectedUnderwriters),
     notifySubsDeadline: chkSubs ? chkSubs.checked : true,
     notifyListing: chkListing ? chkListing.checked : true,
     webhookUrl: inputWebhook ? inputWebhook.value.trim() : '',
+    telegramBotToken: inputTgToken ? inputTgToken.value.trim() : '',
+    telegramChatId: inputTgChat ? inputTgChat.value.trim() : '',
   };
 
   try {
@@ -744,6 +758,44 @@ async function handleSavePreferences() {
     }
   } catch (err) {
     showToast('설정 저장 실패', 'error');
+  }
+}
+
+// 11. 텔레그램 테스트 메시지 전송 처리
+async function handleTestTelegram() {
+  const inputTgToken = document.getElementById('input-tg-token');
+  const inputTgChat = document.getElementById('input-tg-chat');
+  const btn = document.getElementById('btn-test-telegram');
+
+  const botToken = inputTgToken ? inputTgToken.value.trim() : '';
+  const chatId = inputTgChat ? inputTgChat.value.trim() : '';
+
+  if (!botToken || !chatId) {
+    showToast('텔레그램 봇 토큰과 채팅 ID를 모두 입력해주세요.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 전송 중...';
+
+  try {
+    const res = await fetch('/api/telegram/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ botToken, chatId }),
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast('🎉 텔레그램으로 테스트 메시지가 전송되었습니다! 앱을 확인해보세요.', 'success');
+      playBeep();
+    } else {
+      showToast(json.message || '텔레그램 메시지 전송에 실패했습니다.', 'error');
+    }
+  } catch (err) {
+    showToast('서버 통신 실패', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-brands fa-telegram"></i> <span>텔레그램 테스트 메시지 전송</span>';
   }
 }
 

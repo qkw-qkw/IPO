@@ -10,21 +10,14 @@
       "schedule": "50 6 * * *"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/cron",
-      "dest": "/api/cron.ts"
+      "source": "/api/cron",
+      "destination": "/api/cron"
     },
     {
-      "src": "/api/(.*)",
-      "dest": "/api/index.ts"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/public/$1"
+      "source": "/api/(.*)",
+      "destination": "/api/index"
     }
   ]
 }

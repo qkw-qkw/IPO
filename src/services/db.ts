@@ -2,14 +2,20 @@ import fs from 'fs';
 import path from 'path';
 import { IpoItem, UserPreferences, NotificationLog } from '../types';
 
-const DATA_DIR = path.join(__dirname, '../../data');
+// Vercel 서버리스 환경(/tmp) 및 로컬 환경 호환
+const IS_VERCEL = Boolean(process.env.VERCEL);
+const DATA_DIR = IS_VERCEL ? path.join('/tmp', 'data') : path.join(__dirname, '../../data');
 const IPOS_FILE = path.join(DATA_DIR, 'ipos.json');
 const PREFS_FILE = path.join(DATA_DIR, 'preferences.json');
 const LOGS_FILE = path.join(DATA_DIR, 'notification_logs.json');
 
-// 디렉터리 초기화
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+// 디렉터리 초기화 (에러 무시)
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+} catch (e) {
+  // Read-only filesystem 환경에서는 메모리 저장소로 동작
 }
 
 export class JsonDbService {
@@ -26,7 +32,11 @@ export class JsonDbService {
       notifyListing: true,
       updatedAt: new Date().toISOString(),
     };
-    this.loadFromDisk();
+    try {
+      this.loadFromDisk();
+    } catch (e) {
+      // 메모리 기본값 사용
+    }
   }
 
   private loadFromDisk(): void {

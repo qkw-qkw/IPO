@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>한국 공모주 일정 & 실시간 알리미</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Pretendard Font -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased selection:bg-blue-600 selection:text-white pb-16">
+
+  <!-- 네비게이션 헤더 -->
+  <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+          <i class="fa-solid fa-chart-pie text-white text-lg"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg text-white flex items-center gap-2">
+            공모주 알리미
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">38커뮤니케이션 연동</span>
+          </h1>
+          <p class="text-xs text-slate-400">청약 마감일(16:00) & 상장일(09:00) 실시간 알림 시스템</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <!-- 현재 시간 -->
+        <div class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/50 text-xs text-slate-300">
+          <i class="fa-regular fa-clock text-blue-400"></i>
+          <span id="live-clock">--:--:--</span>
+        </div>
+
+        <!-- 수동 새로고침 버튼 -->
+        <button id="btn-refresh" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 text-xs font-medium text-slate-200 transition">
+          <i id="refresh-icon" class="fa-solid fa-arrows-rotate"></i>
+          <span class="hidden sm:inline">데이터 새로고침</span>
+        </button>
+
+        <!-- 알림 설정 버튼 -->
+        <button id="btn-open-settings" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-95 text-xs font-semibold text-white shadow-md shadow-blue-600/30 transition">
+          <i class="fa-solid fa-bell"></i>
+          <span>알림 & 주관사 설정</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 메인 컨텐츠 영역 -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+
+    <!-- 상단 핵심 현황 대시보드 카드 -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <!-- 카드 1: 오늘 청약 마감 -->
+      <div class="bg-gradient-to-br from-red-500/10 to-rose-600/5 border border-red-500/20 rounded-2xl p-4 relative overflow-hidden">
+        <div class="flex items-center justify-between text-red-400 mb-2">
+          <span class="text-xs font-semibold tracking-wide flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+            오늘 청약 마감 (16:00)
+          </span>
+          <i class="fa-solid fa-fire text-lg"></i>
+        </div>
+        <div class="text-2xl sm:text-3xl font-extrabold text-white" id="stat-subs-today">0<span class="text-sm font-normal text-slate-400 ml-1">건</span></div>
+        <div class="text-xs text-slate-400 mt-1" id="stat-subs-today-desc">오늘 마감되는 공모주</div>
+      </div>
+
+      <!-- 카드 2: 오늘 상장 -->
+      <div class="bg-gradient-to-br from-amber-500/10 to-yellow-600/5 border border-amber-500/20 rounded-2xl p-4 relative overflow-hidden">
+        <div class="flex items-center justify-between text-amber-400 mb-2">
+          <span class="text-xs font-semibold tracking-wide flex items-center gap-1.5">
+            <i class="fa-solid fa-rocket"></i>
+            오늘 상장 (09:00)
+          </span>
+        </div>
+        <div class="text-2xl sm:text-3xl font-extrabold text-white" id="stat-listing-today">0<span class="text-sm font-normal text-slate-400 ml-1">건</span></div>
+        <div class="text-xs text-slate-400 mt-1" id="stat-listing-today-desc">오늘 첫 상장되는 공모주</div>
+      </div>
+
+      <!-- 카드 3: 청약 진행 & 예정 -->
+      <div class="bg-gradient-to-br from-blue-500/10 to-cyan-600/5 border border-blue-500/20 rounded-2xl p-4 relative overflow-hidden">
+        <div class="flex items-center justify-between text-blue-400 mb-2">
+          <span class="text-xs font-semibold tracking-wide flex items-center gap-1.5">
+            <i class="fa-regular fa-calendar-check"></i>
+            청약 진행 & 예정
+          </span>
+        </div>
+        <div class="text-2xl sm:text-3xl font-extrabold text-white" id="stat-active-count">0<span class="text-sm font-normal text-slate-400 ml-1">건</span></div>
+        <div class="text-xs text-slate-400 mt-1">총 수집 일정: <span id="stat-total-count">0</span>건</div>
+      </div>
+
+      <!-- 카드 4: 내 관심 주관사 필터 상태 -->
+      <div class="bg-gradient-to-br from-emerald-500/10 to-teal-600/5 border border-emerald-500/20 rounded-2xl p-4 relative overflow-hidden">
+        <div class="flex items-center justify-between text-emerald-400 mb-2">
+          <span class="text-xs font-semibold tracking-wide flex items-center gap-1.5">
+            <i class="fa-solid fa-building-columns"></i>
+            내 관심 주관사 필터
+          </span>
+        </div>
+        <div class="text-2xl sm:text-3xl font-extrabold text-white" id="stat-pref-count">전체<span class="text-sm font-normal text-slate-400 ml-1">선택</span></div>
+        <div class="text-xs text-emerald-400/80 mt-1 flex items-center gap-1">
+          <i class="fa-solid fa-check"></i>
+          <span id="stat-pref-summary">모든 증권사 알림 수신</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 주관사 필터 바 (클릭으로 즉시 필터링) -->
+    <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 sm:p-5 shadow-lg">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-bold text-white flex items-center gap-1.5">
+            <i class="fa-solid fa-filter text-blue-400"></i>
+            주관사 필터
+          </span>
+          <span class="text-xs text-slate-400">클릭하여 원하는 증권사의 공모주만 즉시 모아보세요</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btn-filter-all" class="px-2.5 py-1 text-xs rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition">전체 선택</button>
+          <button id="btn-filter-major" class="px-2.5 py-1 text-xs rounded-lg bg-blue-900/60 hover:bg-blue-800 text-blue-300 border border-blue-700/50 transition">6대 대형사만</button>
+          <button id="btn-filter-clear" class="px-2.5 py-1 text-xs rounded-lg bg-slate-700/60 hover:bg-slate-600 text-slate-400 transition">초기화</button>
+        </div>
+      </div>
+
+      <!-- 주관사 칩 목록 (동적 렌더링) -->
+      <div id="underwriters-chips-container" class="flex flex-wrap gap-2 pt-1">
+        <!-- 칩들이 JS로 동적 추가됨 -->
+        <div class="text-xs text-slate-500 animate-pulse">주관사 목록을 불러오는 중...</div>
+      </div>
+    </div>
+
+    <!-- 검색 및 상태 필터 탭 -->
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+      <!-- 상태 탭 -->
+      <div class="flex items-center bg-slate-800/90 p-1 rounded-xl border border-slate-700/60 w-full sm:w-auto">
+        <button data-status="ALL" class="tab-btn flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white shadow transition">
+          전체 일정
+        </button>
+        <button data-status="ACTIVE" class="tab-btn flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition">
+          청약 진행중
+        </button>
+        <button data-status="UPCOMING" class="tab-btn flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition">
+          청약 예정
+        </button>
+        <button data-status="CLOSED" class="tab-btn flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition">
+          마감/상장완료
+        </button>
+      </div>
+
+      <!-- 검색창, 정렬 드롭다운 및 뷰 모드 -->
+      <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        <!-- 정렬 기준 선택 -->
+        <div class="relative">
+          <select id="sort-select" class="px-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer">
+            <option value="SMART">⚡ 청약 임박순 (9월→10월)</option>
+            <option value="DATE_ASC">📅 청약일 빠른순</option>
+            <option value="DATE_DESC">📅 청약일 늦은순</option>
+            <option value="NAME_ASC">🔤 종목명 가나다순</option>
+          </select>
+        </div>
+
+        <div class="relative flex-1 sm:w-56">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input type="text" id="search-input" placeholder="종목명 또는 주관사 검색..." class="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition">
+        </div>
+        <button id="btn-toggle-view" title="카드/테이블 뷰 전환" class="p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 transition">
+          <i id="view-icon" class="fa-solid fa-table-list text-xs"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- 공모주 목록 컨테이너 -->
+    <div id="ipo-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- 공모주 카드들이 JS로 동적 렌더링됨 -->
+      <div class="col-span-full py-16 text-center text-slate-400">
+        <i class="fa-solid fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
+        <p class="text-sm">38커뮤니케이션 공모주 일정을 불러오는 중입니다...</p>
+      </div>
+    </div>
+
+    <!-- 테이블 뷰 (토글 시 표시) -->
+    <div id="ipo-table-container" class="hidden bg-slate-800/90 border border-slate-700 rounded-2xl overflow-hidden shadow-xl">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-300">
+          <thead class="bg-slate-900/80 text-slate-400 uppercase text-[11px] font-semibold border-b border-slate-700">
+            <tr>
+              <th class="px-4 py-3.5">종목명</th>
+              <th class="px-4 py-3.5">상태</th>
+              <th class="px-4 py-3.5">청약일정</th>
+              <th class="px-4 py-3.5">공모가(원)</th>
+              <th class="px-4 py-3.5">주관사</th>
+              <th class="px-4 py-3.5">상장일</th>
+              <th class="px-4 py-3.5 text-center">38 상세</th>
+            </tr>
+          </thead>
+          <tbody id="ipo-table-body" class="divide-y divide-slate-700/60">
+            <!-- 행 데이터 렌더링 -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- 하단 정보 푸터 -->
+  <footer class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-800 mt-12">
+    <div>
+      <span>데이터 출처: <a href="http://www.38.co.kr/html/ipo/" target="_blank" class="text-blue-400 hover:underline">38커뮤니케이션</a></span>
+      <span class="mx-2">|</span>
+      <span>데이터 갱신 주기: <span class="text-slate-300">매일 18:30 (업무 종료 후 1회 정기 수집)</span></span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span>최근 동기화: <span id="last-sync-time" class="text-slate-300 font-medium">-</span></span>
+      <button id="btn-open-logs" class="text-blue-400 hover:text-blue-300 underline text-xs">알림 발송 내역</button>
+    </div>
+  </footer>
+
+  <!-- 1. 알림 & 주관사 설정 모달 -->
+  <div id="settings-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+    <div class="bg-slate-800 border border-slate-700 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-4">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-bell text-blue-400"></i>
+          알림 및 관심 주관사 설정
+        </h3>
+        <button id="btn-close-settings" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <!-- 브라우저 푸시 알림 권한 섹션 -->
+      <div class="bg-slate-900/60 rounded-2xl p-4 border border-slate-700/60 space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm font-semibold text-white flex items-center gap-1.5">
+              <i class="fa-solid fa-desktop text-blue-400"></i>
+              브라우저 웹 푸시 알림
+            </div>
+            <div class="text-xs text-slate-400">청약 마감일(16:00 전) 및 상장일(09:00 전) 팝업 알림</div>
+          </div>
+          <button id="btn-request-permission" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition">
+            권한 요청
+          </button>
+        </div>
+        <div id="push-status-badge" class="text-xs px-2.5 py-1 rounded-md bg-slate-800 text-slate-400 inline-block">
+          상태 확인 중...
+        </div>
+      </div>
+
+      <!-- 알림 항목 설정 -->
+      <div class="space-y-3">
+        <label class="text-xs font-semibold text-slate-300 uppercase tracking-wider">알림 조건 선택</label>
+        
+        <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900/40 border border-slate-700/40 cursor-pointer hover:bg-slate-900/70">
+          <div>
+            <div class="text-xs font-semibold text-white">청약 마감일 알림 (15:50 발송)</div>
+            <div class="text-[11px] text-slate-400">당일 16:00 청약 마감 10분 전 안내</div>
+          </div>
+          <input type="checkbox" id="chk-notify-subs" checked class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-600 focus:ring-blue-500">
+        </label>
+
+        <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900/40 border border-slate-700/40 cursor-pointer hover:bg-slate-900/70">
+          <div>
+            <div class="text-xs font-semibold text-white">상장일 알림 (08:50 발송)</div>
+            <div class="text-[11px] text-slate-400">당일 09:00 장 시작 10분 전 안내</div>
+          </div>
+          <input type="checkbox" id="chk-notify-listing" checked class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-600 focus:ring-blue-500">
+        </label>
+      </div>
+
+      <!-- 관심 주관사 다중 선택 설정 -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-semibold text-slate-300 uppercase tracking-wider">알림 받을 관심 주관사</label>
+          <span class="text-[11px] text-slate-400">선택하지 않으면 전체 수신</span>
+        </div>
+        <div id="modal-underwriters-list" class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1 bg-slate-900/40 rounded-xl border border-slate-700/40">
+          <!-- 체크박스 목록 JS 렌더링 -->
+        </div>
+      </div>
+
+      <!-- Webhook 연동 (선택사항) -->
+      <div class="space-y-2">
+        <label class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+          <i class="fa-solid fa-link text-indigo-400"></i>
+          외부 웹훅 연동 (Discord / Slack / Telegram 등)
+        </label>
+        <input type="url" id="input-webhook" placeholder="https://discord.com/api/webhooks/..." class="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500">
+      </div>
+
+      <!-- 즉시 테스트 알림 발송 섹션 -->
+      <div class="bg-blue-950/40 border border-blue-800/40 rounded-2xl p-3.5 space-y-2">
+        <div class="text-xs font-semibold text-blue-300 flex items-center gap-1.5">
+          <i class="fa-solid fa-vial"></i>
+          알림 발송 즉시 테스트
+        </div>
+        <div class="flex gap-2">
+          <button id="btn-test-subs" class="flex-1 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition">
+            청약 마감 알림 테스트
+          </button>
+          <button id="btn-test-listing" class="flex-1 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition">
+            상장일 알림 테스트
+          </button>
+        </div>
+      </div>
+
+      <!-- 저장 버튼 -->
+      <div class="flex gap-3 pt-2">
+        <button id="btn-save-settings" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 font-semibold text-xs text-white shadow-lg shadow-blue-600/30 transition">
+          설정 저장하기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 알림 발송 기록 내역 모달 -->
+  <div id="logs-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+    <div class="bg-slate-800 border border-slate-700 rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-clock-rotate-left text-blue-400"></i>
+          알림 발송 기록 로그
+        </h3>
+        <button id="btn-close-logs" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="logs-list-container" class="space-y-2 overflow-y-auto flex-1 pr-1">
+        <!-- 알림 로그 목록 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 토스트 알림 팝업 컨테이너 -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- JavaScript 연동 -->
+  <script src="app.js"></script>
+</body>
+</html>

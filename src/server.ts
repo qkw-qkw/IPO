@@ -76,7 +76,16 @@ app.get('/api/ipos/:id', (req, res) => {
 });
 
 // 3. 주관사 통계 목록 조회 API
-app.get('/api/underwriters', (req, res) => {
+app.get('/api/underwriters', async (req, res) => {
+  let list = dbService.getAllIpos();
+  if (list.length === 0) {
+    try {
+      const crawled = await fetchAllIpoSchedules(false);
+      dbService.saveIpos(crawled);
+    } catch (e) {
+      console.warn('[API] On-demand crawl for underwriters warning:', e);
+    }
+  }
   const stats = dbService.getUnderwritersStats();
   res.json({ success: true, data: stats });
 });

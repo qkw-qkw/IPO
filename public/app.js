@@ -138,6 +138,22 @@ async function loadIpos() {
     if (json.success) {
       state.ipos = json.data;
       state.lastCrawledAt = json.lastCrawledAt;
+
+      // 주관사 목록이 아직 안 채워진 경우 공모주 데이터로부터 즉시 실시간 추출
+      if (state.underwriters.length === 0 && state.ipos.length > 0) {
+        const stats = {};
+        state.ipos.forEach(item => {
+          (item.underwriters || []).forEach(u => {
+            if (u && u !== '-') stats[u] = (stats[u] || 0) + 1;
+          });
+        });
+        state.underwriters = Object.entries(stats)
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count);
+        renderUnderwritersChips();
+        renderModalUnderwritersList();
+      }
+
       updateStats();
       renderIpos();
     }

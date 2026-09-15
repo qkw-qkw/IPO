@@ -4,7 +4,7 @@ import path from 'path';
 import { dbService } from './services/db';
 import { ipoScheduler } from './scheduler/ipoScheduler';
 import { notifierService } from './services/notifier';
-import { sendTelegramMessage, formatSubsDeadlineMessage } from './services/telegram';
+import { sendTelegramMessage, formatSubsDeadlineMessage, parseChatIds } from './services/telegram';
 import { fetchAllIpoSchedules } from './crawler/38crawler';
 
 export const app = express();
@@ -122,7 +122,18 @@ app.get('/api/notifications', (req, res) => {
 // 7. 알림 즉시 테스트 발송 API
 app.post('/api/notifications/test', async (req, res) => {
   const { type, ipoId } = req.body;
-  const ipos = dbService.getAllIpos();
+  
+  let ipos = dbService.getAllIpos();
+  if (ipos.length === 0) {
+    try {
+      const crawled = await fetchAllIpoSchedules(false);
+      dbService.saveIpos(crawled);
+      ipos = dbService.getAllIpos();
+    } catch (e) {
+      console.warn('[API] On-demand crawl for test warning:', e);
+    }
+  }
+
   const foundIpo = ipoId ? dbService.getIpoById(ipoId) : ipos[0];
   const targetIpo: any = foundIpo || {
     id: 'test_sample',
@@ -171,7 +182,18 @@ app.post('/api/telegram/test', async (req, res) => {
     });
   }
 
-  const sampleIpo = dbService.getAllIpos()[0] || {
+  let ipos = dbService.getAllIpos();
+  if (ipos.length === 0) {
+    try {
+      const crawled = await fetchAllIpoSchedules(false);
+      dbService.saveIpos(crawled);
+      ipos = dbService.getAllIpos();
+    } catch (e) {
+      console.warn('[API] On-demand crawl for telegram test warning:', e);
+    }
+  }
+
+  const sampleIpo = ipos[0] || {
     id: 'sample',
     name: '티앤이코리아 (샘플)',
     market: '코스닥',
@@ -193,14 +215,18 @@ app.post('/api/telegram/test', async (req, res) => {
 🔔 <b>[공모주 알리미] 텔레그램 봇 연동 테스트 성공!</b>
 
 정상적으로 텔레그램 알림을 수신할 수 있습니다.
-매일 <b>08:50(상장일)</b> 및 <b>15:50(청약마감일)</b>에 알림이 발송됩니다.
 
 ---------------------------------
 <b>[발송 샘플 미리보기]</b>
 ${sampleMsg}
 `.trim();
 
-  const success = await sendTelegramMessage({ botToken: token, chatId: chat }, testMsg);
+  // import 구문 없이 require 형태로 사용된 parseChatIds 우회 또는 상단 import 추가 (파일 상단에서 처리되어야 함)
+  // We need to make sure parseChatIds is imported at the top of server.ts
+  
+  // Here we just use the parseChatIds function that we'll add to imports
+  const chatIds = parseChatIds(chat);
+  const success = await sendTelegramMessage({ botToken: token, chatIds }, testMsg);
 
   if (success) {
     // 설정 저장

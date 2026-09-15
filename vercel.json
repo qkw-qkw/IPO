@@ -1,15 +1,5 @@
 {
   "version": 2,
-  "crons": [
-    {
-      "path": "/api/cron?type=listing",
-      "schedule": "50 23 * * *"
-    },
-    {
-      "path": "/api/cron?type=subs",
-      "schedule": "50 6 * * *"
-    }
-  ],
   "rewrites": [
     {
       "source": "/api/cron",

@@ -9,7 +9,8 @@ export default async function handler(req: any, res: any) {
 
     // 항상 최신 데이터로 크롤링
     const ipos = await fetchAllIpoSchedules(true);
-    const today = new Date().toISOString().slice(0, 10);
+    // 한국 시간(KST) 기준으로 오늘 날짜 계산
+    const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     // 텔레그램 설정 (환경변수 우선)
     const prefs = dbService.getPreferences();

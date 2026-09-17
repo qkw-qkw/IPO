@@ -440,7 +440,8 @@ function updatePreferencesUI() {
 }
 
 function updateStats() {
-  const today = new Date().toISOString().slice(0, 10);
+  // 한국 시간(KST) 기준으로 오늘 날짜 계산
+  const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
   
   const todaySubs = state.ipos.filter(i => i.subsEndDate === today);
   const todayListing = state.ipos.filter(i => i.listingDate === today);
@@ -461,7 +462,8 @@ function updateStats() {
 
 // 9. 공모주 필터링 및 렌더링
 function getFilteredIpos() {
-  const today = new Date().toISOString().slice(0, 10);
+  // 한국 시간(KST) 기준으로 오늘 날짜 계산
+  const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
   let list = [...state.ipos];
 
   // 1) 주관사 필터 (선택된 주관사가 있는 경우)
@@ -535,7 +537,8 @@ function renderIpos() {
 
 // 공모주 카드 HTML 생성
 function createIpoCardHtml(ipo) {
-  const today = new Date().toISOString().slice(0, 10);
+  // 한국 시간(KST) 기준으로 오늘 날짜 계산
+  const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const isSubsEndToday = ipo.subsEndDate === today;
   const isListingToday = ipo.listingDate === today;
 
@@ -701,7 +704,8 @@ function createIpoCardHtml(ipo) {
 
 // 테이블 행 HTML 생성
 function createIpoTableRowHtml(ipo) {
-  const today = new Date().toISOString().slice(0, 10);
+  // 한국 시간(KST) 기준으로 오늘 날짜 계산
+  const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const isSubsEndToday = ipo.subsEndDate === today;
   const isListingToday = ipo.listingDate === today;
 

@@ -122,7 +122,8 @@ export class JsonDbService {
   }
 
   public getAllIpos(): IpoItem[] {
-    const today = new Date().toISOString().slice(0, 10);
+    // 한국 시간(KST) 기준으로 오늘 날짜 계산
+    const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const items = Array.from(this.ipos.values());
 
     // 1. 다가오는/진행중인 일정 (오늘 포함 미래): 청약 시작일 오름차순 (9월 -> 10월)

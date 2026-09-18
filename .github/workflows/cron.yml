@@ -1,0 +1,47 @@
+name: IPO Notification Cron
+
+on:
+  schedule:
+    # ⏰ 시간 설정 가이드 (UTC 기준)
+    # 한국 시간(KST)은 UTC보다 9시간 빠릅니다.
+    # 예: 한국 시간 오전 8시 40분 = UTC 전날 밤 23시 40분
+    
+    # [1] 상장일 알림 (기본: 한국시간 08:40, 20분 전 알림)
+    # 분(40) 시(23) 일(*) 월(*) 요일(*)
+    - cron: '40 23 * * *'
+    
+    # [2] 청약마감 알림 (기본: 한국시간 15:40, 20분 전 알림)
+    # 분(40) 시(6) 일(*) 월(*) 요일(*)
+    - cron: '40 6 * * *'
+  
+  # 수동으로 버튼을 눌러 테스트할 수 있게 해주는 설정
+  workflow_dispatch:
+    inputs:
+      type:
+        description: '실행할 알림 타입 (listing 또는 subs)'
+        required: false
+        default: 'ALL'
+
+env:
+  # 🔴 [매우 중요] 여기에 실제 배포된 Vercel 앱 주소를 입력하세요!
+  # 예: https://my-ipo-notifier.vercel.app
+  VERCEL_URL: https://ipo-ten-olive.vercel.app
+
+jobs:
+  trigger-listing:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '40 23 * * *' || github.event.inputs.type == 'listing' || github.event.inputs.type == 'ALL'
+    steps:
+      - name: Trigger Listing Alert
+        run: |
+          echo "상장일 알림을 Vercel 서버로 요청합니다."
+          curl -X GET "${{ env.VERCEL_URL }}/api/cron?type=listing&minutes=20"
+          
+  trigger-subs:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '40 6 * * *' || github.event.inputs.type == 'subs' || github.event.inputs.type == 'ALL'
+    steps:
+      - name: Trigger Subs Alert
+        run: |
+          echo "청약마감 알림을 Vercel 서버로 요청합니다."
+          curl -X GET "${{ env.VERCEL_URL }}/api/cron?type=subs&minutes=20"

@@ -41,9 +41,19 @@ export default async function handler(req: any, res: any) {
       : prefs.excludeSpac !== false;
 
     const isSpac = (ipo: any) => {
-      const name = (ipo.name || '').toLowerCase();
-      const market = (ipo.market || '').toLowerCase();
-      return name.includes('스팩') || name.includes('spac') || market.includes('스팩') || market.includes('spac');
+      const name = (ipo.name || '').replace(/\s+/g, '');
+      const market = (ipo.market || '').replace(/\s+/g, '');
+      const isSpacNamePattern = /(호스팩|제\d+호스팩|스팩\d+호|기업인수목적|spac)/i.test(name) ||
+                                /(스팩|spac|기업인수목적)/i.test(market);
+      const fixedPrice = (ipo.fixedPrice || '').replace(/,/g, '').trim();
+      const hopePrice = (ipo.hopePrice || '').replace(/,/g, '').trim();
+      const is2000Won = fixedPrice === '2000' || hopePrice === '2000' || hopePrice.includes('2000');
+      if (isSpacNamePattern) {
+        if (/스팩$|spac$|호스팩|스팩\d+호|기업인수목적/i.test(name) || is2000Won) {
+          return true;
+        }
+      }
+      return false;
     };
 
     const sentAlerts: string[] = [];

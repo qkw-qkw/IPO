@@ -565,11 +565,29 @@ function getFilteredIpos() {
   return list;
 }
 
-// 스팩 종목 여부 판별 헬퍼
+// 스팩 종목 여부 정밀 판별 헬퍼
 function isSpacItem(ipo) {
-  const name = (ipo.name || '').toLowerCase();
-  const market = (ipo.market || '').toLowerCase();
-  return name.includes('스팩') || name.includes('spac') || market.includes('스팩') || market.includes('spac');
+  const name = (ipo.name || '').replace(/\s+/g, '');
+  const market = (ipo.market || '').replace(/\s+/g, '');
+
+  // 1. 국내 스팩주 사명 패턴 (호스팩, 제N호스팩, 스팩N호, 기업인수목적)
+  const isSpacNamePattern = /(호스팩|제\d+호스팩|스팩\d+호|기업인수목적|spac)/i.test(name) ||
+                            /(스팩|spac|기업인수목적)/i.test(market);
+
+  // 2. 공모가 보조 판별 (스팩은 공모가가 예외 없이 2,000원)
+  const fixedPrice = (ipo.fixedPrice || '').replace(/,/g, '').trim();
+  const hopePrice = (ipo.hopePrice || '').replace(/,/g, '').trim();
+  const is2000Won = fixedPrice === '2000' || hopePrice === '2000' || hopePrice.includes('2000');
+
+  // 사명 끝이 '스팩'으로 끝나거나 명확한 스팩 패턴인 경우
+  if (isSpacNamePattern) {
+    // '스팩트럼' 등 사명 중간에 스팩이 들어간 일반기업 방어: 단어 끝이 스팩이거나 호수가 있는 경우
+    if (/스팩$|spac$|호스팩|스팩\d+호|기업인수목적/i.test(name) || is2000Won) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function renderIpos() {

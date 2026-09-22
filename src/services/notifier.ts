@@ -15,11 +15,21 @@ export class NotifierService {
     return ipoUnderwriters.some(u => preferredUnderwriters.includes(u));
   }
 
+  public isSpac(ipo: IpoItem): boolean {
+    const name = (ipo.name || '').toLowerCase();
+    const market = (ipo.market || '').toLowerCase();
+    return name.includes('스팩') || name.includes('spac') || market.includes('스팩') || market.includes('spac');
+  }
+
   /**
    * 청약 마감 임박 알림 전송 (16:00 전)
    */
   public async sendSubsDeadlineAlert(ipo: IpoItem, prefs: UserPreferences): Promise<NotificationLog | null> {
     if (!prefs.notifySubsDeadline) return null;
+    if (prefs.excludeSpac !== false && this.isSpac(ipo)) {
+      console.log(`[Notifier] Skipped SPAC item: ${ipo.name}`);
+      return null;
+    }
     if (!this.isUnderwriterMatched(ipo.underwriters, prefs.preferredUnderwriters)) {
       console.log(`[Notifier] Skipped ${ipo.name} (Underwriters [${ipo.underwriters.join(', ')}] not in user preferences)`);
       return null;
@@ -63,6 +73,10 @@ export class NotifierService {
    */
   public async sendListingAlert(ipo: IpoItem, prefs: UserPreferences): Promise<NotificationLog | null> {
     if (!prefs.notifyListing) return null;
+    if (prefs.excludeSpac !== false && this.isSpac(ipo)) {
+      console.log(`[Notifier] Skipped SPAC listing alert: ${ipo.name}`);
+      return null;
+    }
     if (!this.isUnderwriterMatched(ipo.underwriters, prefs.preferredUnderwriters)) {
       console.log(`[Notifier] Skipped ${ipo.name} listing alert (Underwriter not in preferences)`);
       return null;

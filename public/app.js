@@ -9,12 +9,14 @@ const state = {
   selectedUnderwriters: new Set(),
   currentStatus: 'ALL',
   searchQuery: '',
-  sortBy: 'SMART', // 'SMART' | 'DATE_ASC' | 'DATE_DESC' | 'NAME_ASC'
+  excludeSpacInView: false, // 화면 목록 스팩 제외 토글
+  sortBy: 'ALL_SOON', // 'ALL_SOON' | 'SUBS_SOON' | 'LISTING_SOON'
   viewMode: 'grid', // 'grid' | 'table'
   preferences: {
     preferredUnderwriters: [],
     notifySubsDeadline: true,
     notifyListing: true,
+    excludeSpac: true, // 스팩주 알림 제외 기본값
     webhookUrl: '',
   },
   lastCrawledAt: null,
@@ -253,6 +255,24 @@ function setupEventListeners() {
     });
   });
 
+  // 스팩 제외 토글 버튼
+  const btnToggleSpac = document.getElementById('btn-toggle-spac');
+  if (btnToggleSpac) {
+    btnToggleSpac.addEventListener('click', () => {
+      state.excludeSpacInView = !state.excludeSpacInView;
+      if (state.excludeSpacInView) {
+        btnToggleSpac.classList.remove('bg-slate-800', 'text-slate-300', 'border-slate-700');
+        btnToggleSpac.classList.add('bg-amber-600', 'text-white', 'border-amber-500', 'shadow-md', 'shadow-amber-600/30');
+        showToast('스팩(SPAC) 종목을 목록에서 제외했습니다.', 'info');
+      } else {
+        btnToggleSpac.classList.remove('bg-amber-600', 'text-white', 'border-amber-500', 'shadow-md', 'shadow-amber-600/30');
+        btnToggleSpac.classList.add('bg-slate-800', 'text-slate-300', 'border-slate-700');
+        showToast('모든 공모주(스팩 포함)를 표시합니다.', 'info');
+      }
+      renderIpos();
+    });
+  }
+
   // 검색창 입력
   const searchInput = document.getElementById('search-input');
   searchInput.addEventListener('input', (e) => {
@@ -428,12 +448,14 @@ function updatePreferencesUI() {
   // 모달 인풋 동기화
   const chkSubs = document.getElementById('chk-notify-subs');
   const chkListing = document.getElementById('chk-notify-listing');
+  const chkExcludeSpac = document.getElementById('chk-exclude-spac');
   const inputWebhook = document.getElementById('input-webhook');
   const inputTgToken = document.getElementById('input-tg-token');
   const inputTgChat = document.getElementById('input-tg-chat');
 
   if (chkSubs) chkSubs.checked = state.preferences.notifySubsDeadline !== false;
   if (chkListing) chkListing.checked = state.preferences.notifyListing !== false;
+  if (chkExcludeSpac) chkExcludeSpac.checked = state.preferences.excludeSpac !== false;
   if (inputWebhook) inputWebhook.value = state.preferences.webhookUrl || '';
   if (inputTgToken) inputTgToken.value = state.preferences.telegramBotToken || '';
   if (inputTgChat) inputTgChat.value = state.preferences.telegramChatId || '';
@@ -488,22 +510,66 @@ function getFilteredIpos() {
     );
   }
 
-  // 4) 정렬 적용
-  if (state.sortBy === 'SMART') {
+  // 4) 스팩(SPAC) 제외 필터
+  if (state.excludeSpacInView) {
+    list = list.filter(item => !isSpacItem(item));
+  }
+
+  // 5) 정렬 적용
+  if (state.sortBy === 'ALL_SOON' || state.sortBy === 'SMART') {
+    // 전체 빠른순: 청약이든 상장이든 오늘 이후 가장 빠른 유효 일정(D-Day) 기준 정렬
+    const getNextEventDate = (item) => {
+      const dates = [];
+      if (item.subsStartDate && item.subsStartDate >= today) dates.push(item.subsStartDate);
+      if (item.subsEndDate && item.subsEndDate >= today) dates.push(item.subsEndDate);
+      if (item.listingDate && item.listingDate >= today) dates.push(item.listingDate);
+      if (dates.length > 0) {
+        return dates.sort()[0]; // 가장 가까운 미래 일정
+      }
+      // 미래 일정이 없으면 최근 지난 일정(내림차순 정렬용)
+      return null;
+    };
+
+    const upcoming = list.filter(item => getNextEventDate(item) !== null)
+      .sort((a, b) => {
+        const dateA = getNextEventDate(a);
+        const dateB = getNextEventDate(b);
+        return dateA.localeCompare(dateB);
+      });
+
+    const past = list.filter(item => getNextEventDate(item) === null)
+      .sort((a, b) => {
+        const lastA = a.listingDate || a.subsEndDate || a.subsStartDate || '';
+        const lastB = b.listingDate || b.subsEndDate || b.subsStartDate || '';
+        return lastB.localeCompare(lastA);
+      });
+
+    list = [...upcoming, ...past];
+  } else if (state.sortBy === 'SUBS_SOON' || state.sortBy === 'DATE_ASC') {
+    // 청약 빠른순: 청약 시작일 오름차순 (미래 우선, 과거 후순위)
     const upcoming = list.filter(i => (i.subsEndDate || i.subsStartDate) >= today)
       .sort((a, b) => (a.subsStartDate || '').localeCompare(b.subsStartDate || ''));
     const closed = list.filter(i => (i.subsEndDate || i.subsStartDate) < today)
       .sort((a, b) => (b.subsStartDate || '').localeCompare(a.subsStartDate || ''));
     list = [...upcoming, ...closed];
-  } else if (state.sortBy === 'DATE_ASC') {
-    list.sort((a, b) => (a.subsStartDate || '').localeCompare(b.subsStartDate || ''));
-  } else if (state.sortBy === 'DATE_DESC') {
-    list.sort((a, b) => (b.subsStartDate || '').localeCompare(a.subsStartDate || ''));
-  } else if (state.sortBy === 'NAME_ASC') {
-    list.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  } else if (state.sortBy === 'LISTING_SOON') {
+    // 상장 빠른순: 상장 예정일 기준 오름차순 (상장일 미정은 맨 뒤로)
+    const withListingUpcoming = list.filter(i => i.listingDate && i.listingDate >= today)
+      .sort((a, b) => a.listingDate.localeCompare(b.listingDate));
+    const withoutListing = list.filter(i => !i.listingDate || i.listingDate === '-');
+    const pastListing = list.filter(i => i.listingDate && i.listingDate < today)
+      .sort((a, b) => b.listingDate.localeCompare(a.listingDate));
+    list = [...withListingUpcoming, ...withoutListing, ...pastListing];
   }
 
   return list;
+}
+
+// 스팩 종목 여부 판별 헬퍼
+function isSpacItem(ipo) {
+  const name = (ipo.name || '').toLowerCase();
+  const market = (ipo.market || '').toLowerCase();
+  return name.includes('스팩') || name.includes('spac') || market.includes('스팩') || market.includes('spac');
 }
 
 function renderIpos() {
@@ -747,6 +813,7 @@ function createIpoTableRowHtml(ipo) {
 async function handleSavePreferences() {
   const chkSubs = document.getElementById('chk-notify-subs');
   const chkListing = document.getElementById('chk-notify-listing');
+  const chkExcludeSpac = document.getElementById('chk-exclude-spac');
   const inputWebhook = document.getElementById('input-webhook');
   const inputTgToken = document.getElementById('input-tg-token');
   const inputTgChat = document.getElementById('input-tg-chat');
@@ -755,6 +822,7 @@ async function handleSavePreferences() {
     preferredUnderwriters: Array.from(state.selectedUnderwriters),
     notifySubsDeadline: chkSubs ? chkSubs.checked : true,
     notifyListing: chkListing ? chkListing.checked : true,
+    excludeSpac: chkExcludeSpac ? chkExcludeSpac.checked : true,
     webhookUrl: inputWebhook ? inputWebhook.value.trim() : '',
     telegramBotToken: inputTgToken ? inputTgToken.value.trim() : '',
     telegramChatId: inputTgChat ? inputTgChat.value.trim() : '',

@@ -35,12 +35,27 @@ export default async function handler(req: any, res: any) {
       return underwriters.some(u => preferredUnderwriters.includes(u));
     };
 
+    // 스팩주 알림 제외 여부 (환경변수 EXCLUDE_SPAC 또는 prefs.excludeSpac, 기본 true)
+    const excludeSpac = process.env.EXCLUDE_SPAC !== undefined 
+      ? process.env.EXCLUDE_SPAC === 'true' 
+      : prefs.excludeSpac !== false;
+
+    const isSpac = (ipo: any) => {
+      const name = (ipo.name || '').toLowerCase();
+      const market = (ipo.market || '').toLowerCase();
+      return name.includes('스팩') || name.includes('spac') || market.includes('스팩') || market.includes('spac');
+    };
+
     const sentAlerts: string[] = [];
 
     // 청약 마감일 알림 체크
     if (type === 'subs' || !type) {
       const deadlineIpos = ipos.filter(i => i.subsEndDate === today);
       for (const ipo of deadlineIpos) {
+        if (excludeSpac && isSpac(ipo)) {
+          console.log(`[Vercel Cron] Skipped SPAC item: ${ipo.name}`);
+          continue;
+        }
         if (isMatched(ipo.underwriters)) {
           const msg = formatSubsDeadlineMessage(ipo, minutesBefore);
           if (botToken && chatIds.length > 0) {
@@ -55,6 +70,10 @@ export default async function handler(req: any, res: any) {
     if (type === 'listing' || !type) {
       const listingIpos = ipos.filter(i => i.listingDate === today);
       for (const ipo of listingIpos) {
+        if (excludeSpac && isSpac(ipo)) {
+          console.log(`[Vercel Cron] Skipped SPAC item: ${ipo.name}`);
+          continue;
+        }
         if (isMatched(ipo.underwriters)) {
           const msg = formatListingMessage(ipo, minutesBefore);
           if (botToken && chatIds.length > 0) {

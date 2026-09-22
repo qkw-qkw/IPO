@@ -22,6 +22,7 @@ export interface UserPreferences {
   preferredUnderwriters: string[]; // 관심 주관사 목록 (빈 배열이면 전체 관심)
   notifySubsDeadline: boolean;     // 청약 마감 알림 활성화 여부 (기본 true)
   notifyListing: boolean;          // 상장일 알림 활성화 여부 (기본 true)
+  excludeSpac?: boolean;           // 스팩주 알림 제외 여부 (기본 false 또는 true)
   telegramBotToken?: string;       // 텔레그램 봇 토큰 (예: 123456:ABC-DEF...)
   telegramChatId?: string;         // 텔레그램 수신 채팅 ID (예: 123456789)
   webhookUrl?: string;             // Discord / Slack / Telegram 웹훅 URL

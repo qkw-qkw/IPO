@@ -30,6 +30,7 @@ export class JsonDbService {
       preferredUnderwriters: [], // 빈 배열: 전체 주관사 관심
       notifySubsDeadline: true,
       notifyListing: true,
+      excludeSpac: true, // 기본값: 스팩주 알림 제외
       updatedAt: new Date().toISOString(),
     };
     try {
@@ -126,15 +127,32 @@ export class JsonDbService {
     const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const items = Array.from(this.ipos.values());
 
-    // 1. 다가오는/진행중인 일정 (오늘 포함 미래): 청약 시작일 오름차순 (9월 -> 10월)
-    const upcomingOrActive = items
-      .filter(item => (item.subsEndDate || item.subsStartDate) >= today)
-      .sort((a, b) => (a.subsStartDate || '').localeCompare(b.subsStartDate || ''));
+    // 전체 빠른순: 청약 시작일, 마감일, 상장일 중 오늘 이후 가장 가까운 유효 일정 기준
+    const getNextEventDate = (item: IpoItem) => {
+      const dates: string[] = [];
+      if (item.subsStartDate && item.subsStartDate >= today) dates.push(item.subsStartDate);
+      if (item.subsEndDate && item.subsEndDate >= today) dates.push(item.subsEndDate);
+      if (item.listingDate && item.listingDate >= today) dates.push(item.listingDate);
+      return dates.length > 0 ? dates.sort()[0] : null;
+    };
 
-    // 2. 이미 마감/상장된 과거 일정: 최근 마감일 기준 내림차순
+    // 1. 다가오는/진행중인 일정 (오늘 포함 미래): 가장 임박한 D-Day 오름차순
+    const upcomingOrActive = items
+      .filter(item => getNextEventDate(item) !== null)
+      .sort((a, b) => {
+        const dateA = getNextEventDate(a)!;
+        const dateB = getNextEventDate(b)!;
+        return dateA.localeCompare(dateB);
+      });
+
+    // 2. 이미 모든 일정이 지난 과거 일정: 최근 일정 기준 내림차순
     const pastClosed = items
-      .filter(item => (item.subsEndDate || item.subsStartDate) < today)
-      .sort((a, b) => (b.subsStartDate || '').localeCompare(a.subsStartDate || ''));
+      .filter(item => getNextEventDate(item) === null)
+      .sort((a, b) => {
+        const lastA = a.listingDate || a.subsEndDate || a.subsStartDate || '';
+        const lastB = b.listingDate || b.subsEndDate || b.subsStartDate || '';
+        return lastB.localeCompare(lastA);
+      });
 
     return [...upcomingOrActive, ...pastClosed];
   }
